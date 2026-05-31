@@ -1135,9 +1135,11 @@ export default function App() {
                 {/* Embedded Video Player Iframe simulator with cinematic settings */}
                 <iframe
                   id="lightbox-iframe-player"
-                  src={`${getEmbedUrl(selectedWork.videoUrl)}?autoplay=1&mute=0`}
+                  key={selectedWork.id}
+                  src={`${getEmbedUrl(selectedWork.videoUrl)}?autoplay=1&rel=0&modestbranding=1`}
                   title={selectedWork.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                   className="w-full h-full absolute inset-0 border-0"
                 />
