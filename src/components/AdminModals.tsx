@@ -27,6 +27,43 @@ interface AdminModalsProps {
   setEditingWork: (item: PortfolioItem | null) => void;
 }
 
+function extractYoutubeId(url: string | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  try {
+    if (trimmed.includes("youtu.be/")) {
+      const parts = trimmed.split("youtu.be/");
+      if (parts[1]) {
+        return parts[1].split(/[?#]/)[0];
+      }
+    } else if (trimmed.includes("/shorts/")) {
+      const parts = trimmed.split("/shorts/");
+      if (parts[1]) {
+        return parts[1].split(/[?#]/)[0];
+      }
+    } else if (trimmed.includes("/embed/")) {
+      const parts = trimmed.split("/embed/");
+      if (parts[1]) {
+        return parts[1].split(/[?#]/)[0];
+      }
+    } else {
+      const urlObj = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+      const id = urlObj.searchParams.get("v");
+      if (id) return id;
+      const vPart = trimmed.split("v=");
+      if (vPart[1]) {
+        return vPart[1].split(/[&?#]/)[0];
+      }
+    }
+  } catch (e) {
+    const vPart = url.split("v=");
+    if (vPart[1]) {
+      return vPart[1].split(/[&?#]/)[0];
+    }
+  }
+  return null;
+}
+
 export function AdminModals({
   isAdmin,
   setIsAdmin,
@@ -51,6 +88,13 @@ export function AdminModals({
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [settingsTab, setSettingsTab] = useState<"branding" | "contact" | "social" | "stats" | "services" | "reviews" | "password" | "manual">("branding");
+  const [newPasswordInput, setNewPasswordInput] = useState(settings.password || "");
+
+  React.useEffect(() => {
+    if (settings.password) {
+      setNewPasswordInput(settings.password);
+    }
+  }, [settings.password]);
 
   // GitHub Gist sync states
   const [tempGistId, setTempGistId] = useState(gistConfig?.gistId || "");
@@ -513,9 +557,26 @@ export function AdminModals({
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[9px] uppercase tracking-widest font-sans text-[#c9a86c]">
-                        Thumbnail Image URL * (Resolves instantly for visitor devices)
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[9px] uppercase tracking-widest font-sans text-[#c9a86c]">
+                          Thumbnail Image URL * (Resolves instantly for visitor devices)
+                        </label>
+                        {workForm.videoUrl && extractYoutubeId(workForm.videoUrl) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ytId = extractYoutubeId(workForm.videoUrl);
+                              if (ytId) {
+                                setWorkForm({ ...workForm, image: `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` });
+                                onShowToast("YouTube Thumbnail imported successfully into the field!");
+                              }
+                            }}
+                            className="text-[9px] uppercase font-bold tracking-wider text-[#c9a86c] hover:text-[#e8d5a3] transition-colors bg-zinc-900/40 px-2 py-0.5 border border-[#c9a86c]/20 rounded-none cursor-pointer"
+                          >
+                            Import YouTube Thumbnail
+                          </button>
+                        )}
+                      </div>
                       <input
                         type="text"
                         required
@@ -533,7 +594,15 @@ export function AdminModals({
                       <input
                         type="text"
                         value={workForm.videoUrl || ""}
-                        onChange={(e) => setWorkForm({ ...workForm, videoUrl: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const ytId = extractYoutubeId(val);
+                          let updatedImg = workForm.image || "";
+                          if (ytId && (!workForm.image || workForm.image.trim() === "" || workForm.image.includes("images.unsplash.com"))) {
+                            updatedImg = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                          }
+                          setWorkForm({ ...workForm, videoUrl: val, image: updatedImg });
+                        }}
                         placeholder="e.g. https://www.youtube.com/watch?v=g3-V_7ySvaU or Drive file link"
                         className="bg-[#080808] border border-zinc-800 focus:border-[#c9a86c] text-[#d4cfc8] text-xs px-3.5 py-2.5 focus:outline-none transition-colors rounded-none"
                       />
@@ -1052,26 +1121,37 @@ export function AdminModals({
                             Administrator Security Settings
                           </h4>
 
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-col gap-2.5">
                             <label className="text-[10px] uppercase font-sans tracking-widest text-[#c9a86c]">
                               Update Admin Password Key *
                             </label>
-                            <input
-                              type="password"
-                              defaultValue={settings.password}
-                              onChange={(e) => {
-                                if (e.target.value.trim().length >= 4) {
-                                  const updated = { ...settings, password: e.target.value };
-                                  setSettings(updated);
-                                  localStorage.setItem("pragnya_settings", JSON.stringify(updated));
-                                  onShowToast("Security password changed successfully!");
-                                }
-                              }}
-                              placeholder="admin@123"
-                              className="bg-[#080808] border border-zinc-800 focus:border-[#c9a86c] text-[#d4cfc8] text-xs px-4 py-3 placeholder:text-zinc-700 focus:outline-none transition-colors rounded-none font-mono"
-                            />
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input
+                                type="text"
+                                value={newPasswordInput}
+                                onChange={(e) => setNewPasswordInput(e.target.value)}
+                                placeholder="e.g. admin@123"
+                                className="bg-[#080808] border border-zinc-800 focus:border-[#c9a86c] text-[#d4cfc8] text-xs px-4 py-3 placeholder:text-zinc-700 focus:outline-none transition-colors rounded-none font-mono flex-1"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const trimmed = newPasswordInput.trim();
+                                  if (trimmed.length < 4) {
+                                    onShowToast("Security password must be at least 4 characters long.");
+                                    return;
+                                  }
+                                  const updated = { ...settings, password: trimmed };
+                                  handleSaveSettings(updated);
+                                  onShowToast("Security password changed & backup synced successfully!");
+                                }}
+                                className="px-5 py-3 bg-[#c9a86c]/90 hover:bg-[#c9a86c] text-[#080808] font-bold text-[10px] uppercase tracking-wider transition-colors cursor-pointer rounded-none"
+                              >
+                                Save Password Key
+                              </button>
+                            </div>
                             <span className="text-[9px] text-[#d4cfc8]/50 leading-normal block">
-                              Must be at least 4 characters long. Saving triggers instant hot reloading.
+                              Must be at least 4 characters long. Saving updates settings locally and triggers an immediate synchronizing backup to your remote Gist cloud.
                             </span>
                           </div>
                         </div>
@@ -1263,6 +1343,106 @@ export function AdminModals({
                         onChange={(e) => handleSaveSettings({ ...settings, heroLogoUrl: e.target.value })}
                         placeholder="https://images.unsplash.com/xxx"
                         className="bg-[#080808] border border-zinc-800 text-xs text-white p-2.5 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MODAL 5.5: EDIT STORY */}
+              {activeModal === "edit-story" && (
+                <div id="story-config-modal" className="py-2">
+                  <div className="flex items-center gap-3.5 border-b border-zinc-900 pb-4 mb-6">
+                    <div className="w-10 h-10 rounded-full border border-[#c9a86c]/40 flex items-center justify-center bg-black/40">
+                      <User className="w-5 h-5 text-[#c9a86c]" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-lg tracking-wider text-white">
+                        EDIT STUDIO STORY & PHILOSOPHY
+                      </h3>
+                      <span className="text-[9px] uppercase tracking-widest text-[#c9a86c] block">
+                        Update your brand philosophy, biography, portrait photo, and signature
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] uppercase tracking-widest font-sans text-[#c9a86c]">
+                        About Story Heading Title
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.aboutHeading || ""}
+                        onChange={(e) => handleSaveSettings({ ...settings, aboutHeading: e.target.value })}
+                        placeholder="Timeless Memories & Magical Reels"
+                        className="bg-[#080808] border border-zinc-800 text-xs text-white p-2.5 focus:outline-none font-sans"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] uppercase tracking-widest font-sans text-[#c9a86c]">
+                        Portrait Image URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.aboutImage || ""}
+                        onChange={(e) => handleSaveSettings({ ...settings, aboutImage: e.target.value })}
+                        placeholder="https://images.unsplash.com/photo-..."
+                        className="bg-[#080808] border border-zinc-800 text-xs text-white p-2.5 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] uppercase tracking-widest font-sans text-[#c9a86c]">
+                          Signature Callout Overlay Text
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.sig || ""}
+                          onChange={(e) => handleSaveSettings({ ...settings, sig: e.target.value })}
+                          placeholder="PRAGNYA SRI"
+                          className="bg-[#080808] border border-zinc-800 text-xs text-white p-2.5 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] uppercase tracking-widest font-sans text-[#c9a86c]">
+                          Signature Job Role Subtext
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.aboutSigLabel || ""}
+                          onChange={(e) => handleSaveSettings({ ...settings, aboutSigLabel: e.target.value })}
+                          placeholder="Creative Director"
+                          className="bg-[#080808] border border-zinc-800 text-xs text-white p-2.5 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] uppercase tracking-widest font-sans text-[#c9a86c]">
+                        First Story Paragraph
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={settings.about1 || ""}
+                        onChange={(e) => handleSaveSettings({ ...settings, about1: e.target.value })}
+                        placeholder="We are passionate storytellers..."
+                        className="bg-[#080808] border border-zinc-800 text-xs text-white p-2.5 focus:outline-none resize-none font-sans leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] uppercase tracking-widest font-sans text-[#c9a86c]">
+                        Second Story Paragraph
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={settings.about2 || ""}
+                        onChange={(e) => handleSaveSettings({ ...settings, about2: e.target.value })}
+                        placeholder="With state-of-the-art tools..."
+                        className="bg-[#080808] border border-zinc-800 text-xs text-white p-2.5 focus:outline-none resize-none font-sans leading-relaxed"
                       />
                     </div>
                   </div>
