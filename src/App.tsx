@@ -157,8 +157,8 @@ export default function App() {
       name: "PRAGNYA SRI CREATIONS",
       tagline: "Capturing Memories, Creating Magic",
       logo: "",
-      phone: "+91 99999 99999",
-      whatsapp: "919999999999",
+      phone: "+91 93980 23998",
+      whatsapp: "919398023998",
       email: "pragnyasri2204@gmail.com",
       instagram: "https://instagram.com/pragnyasri_creations",
       facebook: "https://facebook.com/",
@@ -1992,6 +1992,9 @@ export default function App() {
         onShowToast={triggerToast}
       />
 
+      {/* AI CHATBOT */}
+      <AIChatbot settings={settings} services={services} />
+
     </div>
   );
 }
@@ -2010,5 +2013,122 @@ function MessageSquareIcon() {
     >
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
     </svg>
+  );
+}
+
+// AI Chatbot Component
+function AIChatbot({ settings, services }: { settings: any; services: any[] }) {
+  const [open, setOpen] = React.useState(false);
+  const [messages, setMessages] = React.useState<{ role: string; text: string }[]>([
+    { role: "bot", text: `Hi! 👋 Welcome to ${settings.name}. How can I help you today?` }
+  ]);
+  const [input, setInput] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const bottomRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const servicesList = services.map(s => `${s.title}: ${s.description}`).join("\n");
+  const systemPrompt = `You are a helpful assistant for ${settings.name}, a premium photography and videography studio located in Hyderabad, India.
+
+Services offered:
+${servicesList}
+
+Contact: ${settings.phone} | WhatsApp: ${settings.whatsapp} | Email: ${settings.email}
+
+Answer questions about services, pricing (say "please contact us for pricing"), availability, and location. Be friendly, concise, and professional. If asked something unrelated, politely redirect to studio topics.`;
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput("");
+    setMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setLoading(true);
+
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 300,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userMsg }]
+        })
+      });
+      const data = await response.json();
+      const reply = data.content?.[0]?.text || "Sorry, I couldn't understand that. Please contact us directly!";
+      setMessages(prev => [...prev, { role: "bot", text: reply }]);
+    } catch {
+      setMessages(prev => [...prev, { role: "bot", text: "Sorry, something went wrong. Please WhatsApp us directly!" }]);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <>
+      {/* Chat bubble button */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="fixed bottom-6 left-6 z-[999] w-14 h-14 rounded-full bg-[#c9a86c] flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"
+        aria-label="Chat with us"
+      >
+        {open ? (
+          <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        ) : (
+          <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+        )}
+      </button>
+
+      {/* Chat window */}
+      {open && (
+        <div className="fixed bottom-24 left-6 z-[999] w-80 bg-zinc-950 border border-[#c9a86c]/40 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "420px" }}>
+          {/* Header */}
+          <div className="bg-[#c9a86c] px-4 py-3 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-[#c9a86c] font-bold text-sm">P</div>
+            <div>
+              <p className="text-black font-semibold text-sm">{settings.name}</p>
+              <p className="text-black/70 text-xs">AI Assistant • Online</p>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ maxHeight: "280px" }}>
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${m.role === "user" ? "bg-[#c9a86c] text-black" : "bg-zinc-800 text-white"}`}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-zinc-800 px-3 py-2 rounded-xl text-xs text-white">Typing...</div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-zinc-800 p-2 flex gap-2">
+            <input
+              className="flex-1 bg-zinc-900 text-white text-xs px-3 py-2 rounded-lg outline-none border border-zinc-700 focus:border-[#c9a86c]"
+              placeholder="Type your message..."
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && sendMessage()}
+            />
+            <button
+              onClick={sendMessage}
+              className="bg-[#c9a86c] text-black px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#b8974f] transition-colors"
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
